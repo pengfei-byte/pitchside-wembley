@@ -45,10 +45,17 @@ test("the Wembley reel starts at the first frame with a welcome and a line every
   assert.match(match.filmed, /muted/i);
   for (let i = 1; i < match.cues.length; i += 1) {
     const gap = match.cues[i].at - match.cues[i - 1].at;
-    assert.ok(gap >= 3 && gap <= 8, `${match.cues[i - 1].at}->${match.cues[i].at} (${gap})`);
+    assert.ok(gap >= 3 && gap <= 12, `${match.cues[i - 1].at}->${match.cues[i].at} (${gap})`);
   }
   const cuts = match.cues.filter((cue) => cue.cut).map((cue) => cue.at);
   assert.deepEqual(cuts, [23, 45, 84, 126, 145]);
+  for (const cue of match.cues) {
+    if (cue.cut) continue;
+    for (const key of cuts) {
+      const distance = Math.abs(cue.at - key);
+      assert.ok(distance > 5, `${cue.at} is within 5s of ${key}`);
+    }
+  }
   const spoken = match.cues.map((cue) => cue.cue).join("\n");
   assert.match(spoken, /England nil, Spain nil/);
   assert.match(spoken, /England two, Spain three/);

@@ -39,12 +39,6 @@ const FRAME_NOTES = [
     say: "Play is on. Red shirts and white shirts are spread across the pitch, and the bug is still England nil, Spain nil.",
   },
   {
-    t: 20,
-    label: "Spain come",
-    caption: "Spain in red attack down the right. Still 0-0.",
-    say: "Spain in red come down the right. The bug is still England nil, Spain nil.",
-  },
-  {
     t: 23,
     label: "Spain lead",
     cut: true,
@@ -64,23 +58,11 @@ const FRAME_NOTES = [
     say: "Through the middle now. The keeper in green is on his line, and the bug is still nil-one to Spain.",
   },
   {
-    t: 40,
-    label: "Chase",
-    caption: "Both sides chase the ball. Still 0-1.",
-    say: "White shirts try to step out, red shirts chase. Spain stay one up.",
-  },
-  {
     t: 45,
     label: "Level",
     cut: true,
     caption: "The bug changes to England 1, Spain 1.",
     say: "The bug changes. Level now: England one, Spain one.",
-  },
-  {
-    t: 50,
-    label: "Restart",
-    caption: "Play restarts at 1-1.",
-    say: "Level at one apiece, and the play is rolling again. A white shirt on the ball, red shirts closing in.",
   },
   {
     t: 55,
@@ -111,12 +93,6 @@ const FRAME_NOTES = [
     label: "Box",
     caption: "White shirts attack the Spain goal. The bug stays 1-1.",
     say: "Another run into the Spain box. White shirts arrive, and the scoreboard still says one-one.",
-  },
-  {
-    t: 80,
-    label: "Scramble",
-    caption: "A scramble in the six-yard box. The bug is still 1-1.",
-    say: "Bodies in the six-yard box, the keeper in green reaching, a white shirt on the ground. Still one-one on the bug.",
   },
   {
     t: 84,
@@ -175,22 +151,10 @@ const FRAME_NOTES = [
     say: "The bug changes. Level again: England two, Spain two.",
   },
   {
-    t: 130,
-    label: "Olmo",
-    caption: "Olmo, number 10, celebrates with number 15. Still 2-2.",
-    say: "Olmo, number ten, is in the Spain huddle with number fifteen. Two-two at Wembley.",
-  },
-  {
     t: 135,
     label: "Two apiece",
     caption: "Play continues at 2-2.",
     say: "Play goes on, red and white sharing the pitch, and the bug is still two apiece.",
-  },
-  {
-    t: 140,
-    label: "Spain half",
-    caption: "The ball is in Spain's attacking half. Still 2-2.",
-    say: "The ball is in Spain's attacking half, the goal on the left of the picture. Still two-two.",
   },
   {
     t: 145,
@@ -198,12 +162,6 @@ const FRAME_NOTES = [
     cut: true,
     caption: "The bug changes to England 2, Spain 3.",
     say: "The bug changes. England two, Spain three.",
-  },
-  {
-    t: 150,
-    label: "Bench",
-    caption: "The England bench. A coach in a dark suit turns away. Still 2-3.",
-    say: "On the England bench the coaches are up. A dark suit turns away from the pitch. The score is still two-three.",
   },
   {
     t: 155,
