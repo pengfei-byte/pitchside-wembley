@@ -18,12 +18,31 @@ function decide(cues, spoken, sent, time, ahead, holding, booted, forcedDrops) {
     }
   }
 
+  const cutDue = !holding && cues.find((cue) => (
+    cue.cut
+    && !spoken.has(cue.id)
+    && !sent.has(cue.id)
+    && !dropped.has(cue.id)
+    && time >= cue.at - LEAD_SEC
+  ));
+  if (cutDue) {
+    for (const cue of cues) {
+      if (cue.id === cutDue.id) break;
+      if (!spoken.has(cue.id) && !dropped.has(cue.id)) {
+        dropped.add(cue.id);
+        dropIds.push(cue.id);
+      }
+    }
+  }
+
   const pending = cues.find((cue) => !spoken.has(cue.id) && !dropped.has(cue.id)) || null;
   const hold = pending ? (!booted || time >= pending.at - GATE_SLACK_SEC) : !booted;
   const holdAt = pending ? pending.at : 0;
 
   let sayId = null;
-  if ((!ahead || dropIds.length > 0) && !holding) {
+  if (cutDue) {
+    sayId = cutDue.id;
+  } else if ((!ahead || dropIds.length > 0) && !holding) {
     const next = cues.find((cue) => !spoken.has(cue.id) && !sent.has(cue.id) && !dropped.has(cue.id));
     if (next && (hold || time >= next.at - LEAD_SEC)) sayId = next.id;
   }

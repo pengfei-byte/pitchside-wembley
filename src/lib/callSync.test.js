@@ -68,6 +68,46 @@ test("once every line has been spoken, the picture plays through", () => {
   assert.equal(plan.sayId, null);
 });
 
+test("a score change cuts the line already in progress and the picture aims at that moment", () => {
+  const notes = [
+    { id: "nil", at: 20 },
+    { id: "goal", at: 23, cut: true },
+  ];
+  const early = planCall({
+    cues: notes,
+    sentIds: new Set(["nil"]),
+    time: 21,
+    ahead: true,
+    booted: true,
+  });
+  assert.deepEqual(early.dropIds, ["nil"]);
+  assert.equal(early.interrupt, true);
+  assert.equal(early.sayId, "goal");
+  assert.equal(early.action, "play");
+  assert.equal(early.holdAt, 23);
+
+  const onTheGoal = planCall({
+    cues: notes,
+    spokenIds: new Set(["nil"]),
+    sentIds: new Set(["goal"]),
+    time: 23,
+    ahead: true,
+    booted: true,
+  });
+  assert.equal(onTheGoal.action, "hold");
+  assert.equal(onTheGoal.holdAt, 23);
+  assert.equal(onTheGoal.sayId, null);
+
+  const protectedWelcome = planCall({
+    cues: notes,
+    time: 21,
+    ahead: true,
+    holding: true,
+    booted: true,
+  });
+  assert.equal(protectedWelcome.sayId, null);
+});
+
 test("the welcome hold blocks the next submit, and a stalled line is abandoned", () => {
   const held = planCall({
     cues,

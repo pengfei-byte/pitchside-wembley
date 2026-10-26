@@ -42,13 +42,14 @@ const FRAME_NOTES = [
     t: 20,
     label: "Spain come",
     caption: "Spain in red attack down the right. Still 0-0.",
-    say: "Spain in red come down the right. White shirts drop off, and the score in the corner has not moved.",
+    say: "Spain in red come down the right. The bug is still England nil, Spain nil.",
   },
   {
-    t: 25,
+    t: 23,
     label: "Spain lead",
-    caption: "Spain shirts celebrate in front of the crowd. The bug reads 0-1.",
-    say: "Spain shirts are up in front of that crowd. The bug has changed: England nil, Spain one.",
+    cut: true,
+    caption: "The bug changes to England 0, Spain 1.",
+    say: "The bug changes. England nil, Spain one.",
   },
   {
     t: 30,
@@ -71,8 +72,9 @@ const FRAME_NOTES = [
   {
     t: 45,
     label: "Level",
-    caption: "England number 11, arms out. The bug reads England 1, Spain 1.",
-    say: "England's number eleven has both arms out. The bug is level: England one, Spain one.",
+    cut: true,
+    caption: "The bug changes to England 1, Spain 1.",
+    say: "The bug changes. Level now: England one, Spain one.",
   },
   {
     t: 50,
@@ -117,10 +119,11 @@ const FRAME_NOTES = [
     say: "Bodies in the six-yard box, the keeper in green reaching, a white shirt on the ground. Still one-one on the bug.",
   },
   {
-    t: 85,
+    t: 84,
     label: "England lead",
+    cut: true,
     caption: "The bug changes to England 2, Spain 1.",
-    say: "Now the bug changes. England two, Spain one.",
+    say: "The bug changes. England two, Spain one.",
   },
   {
     t: 90,
@@ -165,10 +168,11 @@ const FRAME_NOTES = [
     say: "Out in the open, both teams stretched across Wembley. The score has not moved from two-one.",
   },
   {
-    t: 125,
+    t: 126,
     label: "Level again",
-    caption: "Alex B., number 15, fist clenched. The bug reads England 2, Spain 2.",
-    say: "Number fifteen, Alex B. on the shirt, fist clenched. The bug is level again: England two, Spain two.",
+    cut: true,
+    caption: "The bug changes to England 2, Spain 2.",
+    say: "The bug changes. Level again: England two, Spain two.",
   },
   {
     t: 130,
@@ -191,8 +195,9 @@ const FRAME_NOTES = [
   {
     t: 145,
     label: "Spain ahead",
-    caption: "Spain players embrace. The bug reads England 2, Spain 3.",
-    say: "Spain are embracing on the grass. The bug now reads England two, Spain three.",
+    cut: true,
+    caption: "The bug changes to England 2, Spain 3.",
+    say: "The bug changes. England two, Spain three.",
   },
   {
     t: 150,
@@ -257,7 +262,7 @@ const FRAME_NOTES = [
 ];
 
 export function loadMatch() {
-  const cues = compileCall(FRAME_NOTES, { minGap: 4 });
+  const cues = compileCall(FRAME_NOTES, { minGap: 3 });
   return {
     ...MATCH,
     cues,
