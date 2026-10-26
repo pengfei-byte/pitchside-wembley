@@ -30,19 +30,24 @@ test("compileCall keeps picture order and drops lines that would talk over each 
   assert.ok(cues.every((cue) => cue.cue.length <= 2000));
 });
 
-test("the Wembley reel starts at 2:25 with a welcome and a line every five seconds", () => {
+test("the Wembley reel starts at the first frame with a welcome and a line every five seconds", () => {
   const match = loadMatch();
   assert.equal(match.video, "/match.mp4");
-  assert.equal(match.startAt, 145);
-  assert.ok(match.cues.length >= 10);
+  assert.equal(match.startAt, 0);
+  assert.ok(match.duration >= 190);
+  assert.equal(match.cues[0].at, 0);
+  assert.ok(match.cues.length >= 30);
   assert.match(
     match.cues[0].cue,
     /Welcome to the Pitchside, Your Live football commentator powered by Reverie AI\./
   );
   assert.equal(match.cues[0].hold, true);
+  assert.doesNotMatch(match.filmed, /muted/i);
   for (let i = 1; i < match.cues.length; i += 1) {
     const gap = match.cues[i].at - match.cues[i - 1].at;
     assert.ok(gap >= 4 && gap <= 6, gap);
   }
-  assert.match(match.cues.map((cue) => cue.cue).join("\n"), /England two, Spain three/);
+  const spoken = match.cues.map((cue) => cue.cue).join("\n");
+  assert.match(spoken, /England nil, Spain nil/);
+  assert.match(spoken, /England two, Spain three/);
 });

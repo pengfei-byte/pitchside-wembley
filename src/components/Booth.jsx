@@ -20,6 +20,11 @@ function clock(seconds) {
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
 }
 
+function readStart(value) {
+  const start = Number(value);
+  return Number.isFinite(start) ? start : 0;
+}
+
 export default function Booth() {
   const filmRef = useRef(null);
   const remoteVideo = useRef(null);
@@ -36,7 +41,8 @@ export default function Booth() {
   const connectTimerRef = useRef(null);
   const hiddenTimerRef = useRef(null);
   const showFailRef = useRef(() => {});
-  const startAtRef = useRef(145);
+  const startAtRef = useRef(0);
+  const playTokenRef = useRef(0);
 
   const [match, setMatch] = useState(null);
   const [health, setHealth] = useState(null);
@@ -45,6 +51,7 @@ export default function Booth() {
   const [fail, setFail] = useState(null);
   const [live, setLive] = useState(false);
   const [filmTime, setFilmTime] = useState(0);
+  const [filmRatio, setFilmRatio] = useState(0);
   const [onAir, setOnAir] = useState(null);
 
   const connecting = phase === "joining" || (phase === "onair" && !live);
@@ -93,7 +100,6 @@ export default function Booth() {
   const syncToFilm = useCallback(() => {
     const film = filmRef.current;
     if (!film || !liveRef.current) return;
-    film.muted = true;
     const time = film.currentTime + startAtRef.current;
     setFilmTime(time);
     if (film.paused) return;
@@ -122,7 +128,7 @@ export default function Booth() {
   const attachClient = useCallback((data) => {
     sessionRef.current = data.session.session_id;
     cuesRef.current = data.match?.cues || [];
-    startAtRef.current = Number(data.match?.startAt) || 145;
+    startAtRef.current = readStart(data.match?.startAt);
     sentRef.current = new Set();
     aheadRef.current = false;
     const client = new R2Client({
@@ -134,8 +140,10 @@ export default function Booth() {
           setStatus("Booth open");
           const film = filmRef.current;
           if (film) {
-            film.muted = true;
+            playTokenRef.current += 1;
             film.currentTime = 0;
+            setFilmTime(startAtRef.current);
+            setFilmRatio(0);
             film.play().catch(() => {});
           }
         }
@@ -176,11 +184,25 @@ export default function Booth() {
     try {
       const film = match || (await fetchMatch());
       setMatch(film);
-      startAtRef.current = Number(film?.startAt) || 145;
+      startAtRef.current = readStart(film?.startAt);
+      const reel = filmRef.current;
+      if (reel) {
+        const token = playTokenRef.current + 1;
+        playTokenRef.current = token;
+        reel.currentTime = 0;
+        setFilmRatio(0);
+        reel.play()?.then(() => {
+          if (playTokenRef.current !== token) return;
+          reel.pause();
+          reel.currentTime = 0;
+          setFilmTime(startAtRef.current);
+          setFilmRatio(0);
+        }).catch(() => {});
+      }
       const data = await startBroadcast();
       if (data.match) {
         setMatch(data.match);
-        startAtRef.current = Number(data.match.startAt) || startAtRef.current;
+        startAtRef.current = readStart(data.match.startAt);
       }
       if (data.mode === "realtime" && data.credentials) {
         attachClient(data);
@@ -280,21 +302,41 @@ export default function Booth() {
         </aside>
 
         <section className="film">
-          <div className="screen">
-            <video ref={filmRef} className="match-film" src="/match.mp4" muted playsInline preload="auto" />
+          <div className={`screen${connecting ? " is-opening" : ""}`}>
+            <video
+              ref={filmRef}
+              className="match-film"
+              src="/match.mp4"
+              playsInline
+              preload="auto"
+              onTimeUpdate={(event) => {
+                const reel = event.currentTarget;
+                const duration = reel.duration;
+                setFilmTime(reel.currentTime + startAtRef.current);
+                setFilmRatio(Number.isFinite(duration) && duration > 0 ? reel.currentTime / duration : 0);
+              }}
+            />
             <div className="film-shield" />
+            <div className="film-progress" aria-hidden="true">
+              <span style={{ width: `${filmRatio * 100}%` }} />
+            </div>
             {phase === "lobby" && (
               <button type="button" className="start" onClick={start}>
                 Start commentary
               </button>
             )}
-            {connecting && <div className="opening">Opening the booth</div>}
+            {connecting && (
+              <div className="opening" role="status">
+                <i className="opening-orb" aria-hidden="true" />
+                Opening the booth
+              </div>
+            )}
           </div>
           <div className="film-meta">
             <p>{match?.competition || "Football"}</p>
-            <span>{match ? `${match.venue} · from ${clock(match.startAt || 0)}` : "Loading the reel"}</span>
+            <span>{match ? match.venue : "Loading the reel"}</span>
           </div>
-          <p className="mute-note">The match film is muted and cannot be scrubbed. Martin Hale calls what is on the screen.</p>
+          <p className="mute-note">The match film keeps its sound. The progress bar cannot be dragged. Martin Hale calls what is on the screen.</p>
         </section>
       </main>
       <p className="powered">Powered by Reverie R2 API</p>
