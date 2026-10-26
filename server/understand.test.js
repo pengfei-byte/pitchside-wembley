@@ -59,4 +59,10 @@ test("the Wembley reel starts at the first frame with a welcome and a line every
   const spoken = match.cues.map((cue) => cue.cue).join("\n");
   assert.match(spoken, /England nil, Spain nil/);
   assert.match(spoken, /England two, Spain three/);
+  assert.match(spoken, /Gordon shoots/);
+  assert.match(spoken, /Simón dives full length/);
+  assert.match(spoken, /Lamine Yamal/);
+  assert.match(spoken, /Harry Kane/);
+  assert.match(spoken, /Álex Baena/);
+  assert.match(spoken, /Mikel Oyarzabal/);
 });
