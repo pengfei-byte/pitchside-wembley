@@ -16,15 +16,48 @@ test("the reel stays at the opening until the welcome is spoken", () => {
   assert.equal(plan.sayId, "welcome");
 });
 
-test("after the welcome, the picture plays and the next line is ordered early", () => {
+test("after the welcome, the picture plays and the next line is ordered five seconds early", () => {
   const spoken = new Set(["welcome"]);
-  const early = planCall({ cues, spokenIds: spoken, time: 1, booted: true });
-  assert.equal(early.action, "play");
-  assert.equal(early.sayId, null);
-
-  const lead = planCall({ cues, spokenIds: spoken, time: 3, booted: true });
+  const lead = planCall({ cues, spokenIds: spoken, time: 0, booted: true });
   assert.equal(lead.action, "play");
   assert.equal(lead.sayId, "five");
+
+  const spokenFive = new Set(["welcome", "five"]);
+  const notYet = planCall({ cues, spokenIds: spokenFive, time: 4, booted: true });
+  assert.equal(notYet.action, "play");
+  assert.equal(notYet.sayId, null);
+
+  const ten = planCall({ cues, spokenIds: spokenFive, time: 5, booted: true });
+  assert.equal(ten.action, "play");
+  assert.equal(ten.sayId, "ten");
+});
+
+test("a returned line plays as soon as its moment arrives", () => {
+  const spoken = new Set(["welcome"]);
+  const sent = new Set(["five"]);
+  const early = planCall({
+    cues,
+    spokenIds: spoken,
+    sentIds: sent,
+    primedId: "five",
+    time: 4,
+    booted: true,
+  });
+  assert.equal(early.action, "play");
+  assert.equal(early.releaseId, null);
+  assert.equal(early.holdAt, 5);
+
+  const due = planCall({
+    cues,
+    spokenIds: spoken,
+    sentIds: sent,
+    primedId: "five",
+    time: 5,
+    booted: true,
+  });
+  assert.equal(due.action, "play");
+  assert.equal(due.releaseId, "five");
+  assert.equal(due.sayId, "ten");
 });
 
 test("the picture holds on a line until that line is spoken", () => {
@@ -129,5 +162,5 @@ test("the welcome hold blocks the next submit, and a stalled line is abandoned",
   });
   assert.deepEqual(stalled.dropIds, ["five"]);
   assert.equal(stalled.action, "play");
-  assert.equal(stalled.sayId, null);
+  assert.equal(stalled.sayId, "ten");
 });

@@ -1,4 +1,4 @@
-export const LEAD_SEC = 2.2;
+export const LEAD_SEC = 5;
 export const SEGMENT_SEC = 5;
 export const GATE_SLACK_SEC = 0.08;
 export const STALL_MS = 8_000;
@@ -7,7 +7,7 @@ function asSet(value) {
   return value instanceof Set ? value : new Set(value || []);
 }
 
-function decide(cues, spoken, sent, time, ahead, holding, booted, forcedDrops) {
+function decide(cues, spoken, sent, time, ahead, holding, booted, forcedDrops, primedId) {
   const dropIds = [...forcedDrops];
   const dropped = new Set(forcedDrops);
   for (const cue of cues) {
@@ -36,7 +36,13 @@ function decide(cues, spoken, sent, time, ahead, holding, booted, forcedDrops) {
   }
 
   const pending = cues.find((cue) => !spoken.has(cue.id) && !dropped.has(cue.id)) || null;
-  const hold = pending ? (!booted || time >= pending.at - GATE_SLACK_SEC) : !booted;
+  const due = Boolean(
+    pending
+    && primedId
+    && pending.id === primedId
+    && time >= pending.at - GATE_SLACK_SEC
+  );
+  const hold = due ? false : (pending ? (!booted || time >= pending.at - GATE_SLACK_SEC) : !booted);
   const holdAt = pending ? pending.at : 0;
 
   let sayId = null;
@@ -53,6 +59,7 @@ function decide(cues, spoken, sent, time, ahead, holding, booted, forcedDrops) {
     pendingId: pending?.id || null,
     dropIds,
     sayId,
+    releaseId: due ? pending.id : null,
     interrupt: dropIds.some((id) => sent.has(id)),
   };
 }
@@ -66,14 +73,15 @@ export function planCall({
   holding = false,
   booted = false,
   waitedMs = 0,
+  primedId = null,
 }) {
   const spoken = asSet(spokenIds);
   const sent = asSet(sentIds);
-  const first = decide(cues, spoken, sent, time, ahead, holding, booted, []);
+  const first = decide(cues, spoken, sent, time, ahead, holding, booted, [], primedId);
   const stalled = first.action === "hold"
     && first.pendingId
     && sent.has(first.pendingId)
     && waitedMs >= STALL_MS;
   if (!stalled) return first;
-  return decide(cues, spoken, sent, time, ahead, holding, booted, [first.pendingId]);
+  return decide(cues, spoken, sent, time, ahead, holding, booted, [first.pendingId], primedId);
 }

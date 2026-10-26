@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { R2Client } from "../lib/r2.js";
-import { planCall } from "../lib/callSync.js";
+import { GATE_SLACK_SEC, planCall } from "../lib/callSync.js";
 import { closeSession, fetchHealth, fetchMatch, heartbeat, startBroadcast } from "../lib/api.js";
 
 const CONNECT_TIMEOUT_MS = 20_000;
@@ -48,6 +48,7 @@ export default function Booth() {
   const gateSinceRef = useRef(0);
   const syncRef = useRef(() => {});
   const syncingRef = useRef(false);
+  const primedRef = useRef("");
 
   const [match, setMatch] = useState(null);
   const [health, setHealth] = useState(null);
@@ -84,6 +85,7 @@ export default function Booth() {
     spokenRef.current = new Set();
     bootedRef.current = false;
     gateSinceRef.current = 0;
+    primedRef.current = "";
     liveRef.current = false;
     setLive(false);
     try {
@@ -126,6 +128,7 @@ export default function Booth() {
         holding: Date.now() < holdUntilRef.current,
         booted: bootedRef.current,
         waitedMs,
+        primedId: primedRef.current,
       });
 
       if (plan.interrupt) {
@@ -133,7 +136,15 @@ export default function Booth() {
         holdUntilRef.current = 0;
         expectedTurnRef.current = "";
       }
-      for (const id of plan.dropIds) spokenRef.current.add(id);
+      if (plan.releaseId) {
+        spokenRef.current.add(plan.releaseId);
+        if (primedRef.current === plan.releaseId) primedRef.current = "";
+        aheadRef.current = false;
+      }
+      for (const id of plan.dropIds) {
+        spokenRef.current.add(id);
+        if (primedRef.current === id) primedRef.current = "";
+      }
 
       if (plan.action === "hold") {
         const local = Math.max(0, Number(plan.holdAt) - startAtRef.current);
@@ -178,7 +189,32 @@ export default function Booth() {
     spokenRef.current = new Set();
     bootedRef.current = false;
     gateSinceRef.current = 0;
+    primedRef.current = "";
     aheadRef.current = false;
+    const noteReady = (turnId) => {
+      if (!expectedTurnRef.current) return;
+      if (turnId && turnId !== expectedTurnRef.current) return;
+      const cue = currentCueRef.current;
+      if (!cue?.id || spokenRef.current.has(cue.id)) return;
+      const reel = filmRef.current;
+      const time = reel ? reel.currentTime + startAtRef.current : 0;
+      aheadRef.current = false;
+      bootedRef.current = true;
+      gateSinceRef.current = 0;
+      setStatus("On the call");
+      if (cue.hold || time >= cue.at - GATE_SLACK_SEC) {
+        spokenRef.current.add(cue.id);
+        primedRef.current = "";
+        holdUntilRef.current = Date.now() + (cue.hold ? WELCOME_HOLD_MS : 0);
+        if (reel) {
+          reel.muted = true;
+          reel.play().catch(() => {});
+        }
+        return;
+      }
+      primedRef.current = cue.id;
+      holdUntilRef.current = 0;
+    };
     const client = new R2Client({
       credentials: data.credentials,
       remoteVideo: remoteVideo.current,
@@ -196,20 +232,8 @@ export default function Booth() {
             setFilmRatio(0);
           }
         }
-        if (msg.type === "turn.visible") {
-          if (!expectedTurnRef.current) return;
-          if (body.turn_id && body.turn_id !== expectedTurnRef.current) return;
-          if (currentCueRef.current?.id) spokenRef.current.add(currentCueRef.current.id);
-          aheadRef.current = false;
-          bootedRef.current = true;
-          gateSinceRef.current = 0;
-          holdUntilRef.current = Date.now() + (currentCueRef.current?.hold ? WELCOME_HOLD_MS : 0);
-          setStatus("On the call");
-          const reel = filmRef.current;
-          if (reel) {
-            reel.muted = true;
-            reel.play().catch(() => {});
-          }
+        if (msg.type === "turn.visible" || (msg.type === "media.clip" && body.kind === "turn")) {
+          noteReady(body.turn_id);
         }
       },
       onError: (err) => {
