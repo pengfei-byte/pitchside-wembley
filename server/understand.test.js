@@ -42,7 +42,7 @@ test("the Wembley reel starts at the first frame with a welcome and a line every
     /Welcome to the Pitchside, Your Live football commentator powered by Reverie AI\./
   );
   assert.equal(match.cues[0].hold, true);
-  assert.doesNotMatch(match.filmed, /muted/i);
+  assert.match(match.filmed, /muted/i);
   for (let i = 1; i < match.cues.length; i += 1) {
     const gap = match.cues[i].at - match.cues[i - 1].at;
     assert.ok(gap >= 4 && gap <= 6, gap);

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { R2Client } from "../lib/r2.js";
+import { planCall } from "../lib/callSync.js";
 import { closeSession, fetchHealth, fetchMatch, heartbeat, startBroadcast } from "../lib/api.js";
 
-const LEAD_SEC = 2.2;
 const CONNECT_TIMEOUT_MS = 20_000;
 const HIDDEN_CLOSE_MS = 25_000;
 const WELCOME_HOLD_MS = 4_800;
@@ -43,6 +43,11 @@ export default function Booth() {
   const showFailRef = useRef(() => {});
   const startAtRef = useRef(0);
   const playTokenRef = useRef(0);
+  const spokenRef = useRef(new Set());
+  const bootedRef = useRef(false);
+  const gateSinceRef = useRef(0);
+  const syncRef = useRef(() => {});
+  const syncingRef = useRef(false);
 
   const [match, setMatch] = useState(null);
   const [health, setHealth] = useState(null);
@@ -76,6 +81,9 @@ export default function Booth() {
     aheadRef.current = false;
     expectedTurnRef.current = "";
     holdUntilRef.current = 0;
+    spokenRef.current = new Set();
+    bootedRef.current = false;
+    gateSinceRef.current = 0;
     liveRef.current = false;
     setLive(false);
     try {
@@ -99,21 +107,58 @@ export default function Booth() {
 
   const syncToFilm = useCallback(() => {
     const film = filmRef.current;
-    if (!film || !liveRef.current) return;
-    const time = film.currentTime + startAtRef.current;
-    setFilmTime(time);
-    if (film.paused) return;
-    if (Date.now() < holdUntilRef.current) return;
-    if (aheadRef.current) return;
-    const next = cuesRef.current.find((cue) => !sentRef.current.has(cue.id));
-    if (!next || time < next.at - LEAD_SEC) return;
-    sayCue(next);
+    if (!film || !liveRef.current || syncingRef.current) return;
+    syncingRef.current = true;
+    try {
+      film.muted = true;
+      const time = film.currentTime + startAtRef.current;
+      const duration = film.duration;
+      setFilmTime(time);
+      setFilmRatio(Number.isFinite(duration) && duration > 0 ? film.currentTime / duration : 0);
+
+      const waitedMs = gateSinceRef.current ? Date.now() - gateSinceRef.current : 0;
+      const plan = planCall({
+        cues: cuesRef.current,
+        spokenIds: spokenRef.current,
+        sentIds: sentRef.current,
+        time,
+        ahead: aheadRef.current,
+        holding: Date.now() < holdUntilRef.current,
+        booted: bootedRef.current,
+        waitedMs,
+      });
+
+      if (plan.interrupt) {
+        aheadRef.current = false;
+        holdUntilRef.current = 0;
+        expectedTurnRef.current = "";
+      }
+      for (const id of plan.dropIds) spokenRef.current.add(id);
+
+      if (plan.action === "hold") {
+        const local = Math.max(0, Number(plan.holdAt) - startAtRef.current);
+        if (film.currentTime > local + 0.05) film.currentTime = local;
+        if (!film.paused) film.pause();
+        if (!gateSinceRef.current) gateSinceRef.current = Date.now();
+      } else {
+        gateSinceRef.current = 0;
+        if (film.paused && !film.ended) film.play().catch(() => {});
+      }
+
+      if (!plan.sayId) return;
+      const cue = cuesRef.current.find((item) => item.id === plan.sayId);
+      if (cue) sayCue(cue);
+    } finally {
+      syncingRef.current = false;
+    }
   }, [sayCue]);
 
+  syncRef.current = syncToFilm;
+
   useEffect(() => {
-    const timer = setInterval(syncToFilm, 250);
+    const timer = setInterval(() => syncRef.current(), 200);
     return () => clearInterval(timer);
-  }, [syncToFilm]);
+  }, []);
 
   const showFail = useCallback((body) => {
     continueRef.current = false;
@@ -130,6 +175,9 @@ export default function Booth() {
     cuesRef.current = data.match?.cues || [];
     startAtRef.current = readStart(data.match?.startAt);
     sentRef.current = new Set();
+    spokenRef.current = new Set();
+    bootedRef.current = false;
+    gateSinceRef.current = 0;
     aheadRef.current = false;
     const client = new R2Client({
       credentials: data.credentials,
@@ -141,17 +189,27 @@ export default function Booth() {
           const film = filmRef.current;
           if (film) {
             playTokenRef.current += 1;
+            film.muted = true;
+            film.pause();
             film.currentTime = 0;
             setFilmTime(startAtRef.current);
             setFilmRatio(0);
-            film.play().catch(() => {});
           }
         }
         if (msg.type === "turn.visible") {
-          if (body.turn_id && expectedTurnRef.current && body.turn_id !== expectedTurnRef.current) return;
+          if (!expectedTurnRef.current) return;
+          if (body.turn_id && body.turn_id !== expectedTurnRef.current) return;
+          if (currentCueRef.current?.id) spokenRef.current.add(currentCueRef.current.id);
           aheadRef.current = false;
+          bootedRef.current = true;
+          gateSinceRef.current = 0;
           holdUntilRef.current = Date.now() + (currentCueRef.current?.hold ? WELCOME_HOLD_MS : 0);
           setStatus("On the call");
+          const reel = filmRef.current;
+          if (reel) {
+            reel.muted = true;
+            reel.play().catch(() => {});
+          }
         }
       },
       onError: (err) => {
@@ -189,6 +247,7 @@ export default function Booth() {
       if (reel) {
         const token = playTokenRef.current + 1;
         playTokenRef.current = token;
+        reel.muted = true;
         reel.currentTime = 0;
         setFilmRatio(0);
         reel.play()?.then(() => {
@@ -307,14 +366,10 @@ export default function Booth() {
               ref={filmRef}
               className="match-film"
               src="/match.mp4"
+              muted
               playsInline
               preload="auto"
-              onTimeUpdate={(event) => {
-                const reel = event.currentTarget;
-                const duration = reel.duration;
-                setFilmTime(reel.currentTime + startAtRef.current);
-                setFilmRatio(Number.isFinite(duration) && duration > 0 ? reel.currentTime / duration : 0);
-              }}
+              onTimeUpdate={() => syncRef.current()}
             />
             <div className="film-shield" />
             <div className="film-progress" aria-hidden="true">
@@ -336,7 +391,7 @@ export default function Booth() {
             <p>{match?.competition || "Football"}</p>
             <span>{match ? match.venue : "Loading the reel"}</span>
           </div>
-          <p className="mute-note">The match film keeps its sound. The progress bar cannot be dragged. Martin Hale calls what is on the screen.</p>
+          <p className="mute-note">The match film is muted, and it holds when the call has not reached that moment. The progress bar cannot be dragged.</p>
         </section>
       </main>
       <p className="powered">Powered by Reverie R2 API</p>

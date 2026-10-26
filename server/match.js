@@ -12,7 +12,7 @@ export const MATCH = {
   title: "England 2–3 Spain",
   venue: "Wembley Stadium, London",
   kickoff: "Full reel",
-  filmed: "Local picture with its own sound, from the first frame. A line every five seconds, and the bar cannot be dragged.",
+  filmed: "Local picture, muted, from the first frame. The picture holds until that moment is being called.",
 };
 
 const WELCOME =
