@@ -1,72 +1,95 @@
 import { compileCall } from "./understand.js";
 
+export const START_AT = 145;
+
 export const MATCH = {
   id: "eng-esp-highlights",
   videoId: "oewyeR5F7TM",
-  duration: 199,
+  video: "/match.mp4",
+  startAt: START_AT,
+  duration: 54,
   competition: "UEFA Nations League",
   title: "England 2–3 Spain",
   venue: "Wembley Stadium, London",
-  kickoff: "Highlight reel",
-  filmed: "Called from the pictures. This cut has no caption track, so each line is timed to a frame: the Wembley title, then the bug at 1-1, 2-1, 2-2 and 2-3.",
+  kickoff: "From 2:25",
+  filmed: "Local picture, muted, from 2:25. A line every five seconds so the call stays with the frames.",
 };
+
+const WELCOME =
+  "Welcome to the Pitchside, Your Live football commentator powered by Reverie AI.";
 
 const FRAME_NOTES = [
   {
-    t: 6,
-    label: "Title",
-    caption: "Title card: England versus Spain at Wembley, Nations League.",
-    say: "You're on Pitchside. This is England against Spain, Nations League night at Wembley, and the highlight reel is about to run.",
+    t: 145,
+    label: "Welcome",
+    hold: true,
+    caption: WELCOME,
+    say: WELCOME,
   },
   {
-    t: 24,
-    label: "Level",
-    caption: "Open play. The scorebug reads England 1, Spain 1. England in white, Spain in red.",
-    say: "We're into the match. The bug reads England one, Spain one. White shirts and red shirts, and this reel has joined it already level.",
+    t: 150,
+    label: "Celebration",
+    caption: "Spain shirts embrace on the pitch. The bug reads England 2, Spain 3.",
+    say: "Spain are all over each other on the grass. The bug is England two, Spain three, and Wembley has just seen the winner.",
   },
   {
-    t: 52,
-    label: "Still level",
-    caption: "Play continues with the bug still England 1, Spain 1.",
-    say: "Still one apiece. England in white working it across this pitch, Spain in red holding their shape, and the bug has not moved.",
+    t: 155,
+    label: "Bench",
+    caption: "The England bench. A bald coach in a dark suit turns away.",
+    say: "On the England bench the coaches are up. A dark suit turns its back on the pitch. The score on the bug is still two-three.",
   },
   {
-    t: 86,
-    label: "England lead",
-    caption: "The scorebug reads England 2, Spain 1. A white number 9 and Gordon, number 11, are in the pictures.",
-    cut: true,
-    say: "England in front. Two-one. The white number nine is through the picture, Gordon in eleven is in the celebration, and the bug says England two, Spain one.",
+    t: 160,
+    label: "Play",
+    caption: "Play has restarted. Spain in red and blue run toward the goal on the right.",
+    say: "Play is rolling again. Red and blue shirts sprint toward the goal on the right, white shirts chasing, and Spain are still three to two up.",
   },
   {
-    t: 112,
-    label: "Spain attack",
-    caption: "Spain in red attack the England goal. The bug still reads England 2, Spain 1.",
-    say: "Spain come back at them. Red shirts into the England box, a shot at the near side, and the bug is still holding at two-one.",
+    t: 165,
+    label: "Net",
+    caption: "A tight shot through the goal net, an England flag beyond it.",
+    say: "Through the net now, the mesh whipping across the picture, and an England flag hanging in the stand behind the goal.",
   },
   {
-    t: 132,
-    label: "Level again",
-    caption: "The scorebug reads England 2, Spain 2. Spain shirts celebrate.",
-    cut: true,
-    say: "Level again. England two, Spain two. The red shirts are celebrating, and Wembley has been pulled back to all square.",
+    t: 170,
+    label: "Wide",
+    caption: "A wide shot of the Wembley pitch, two players and a ball, still 2-3.",
+    say: "Wide on Wembley. Two players, one ball, a huge green pitch, and the score in the corner has not moved from two-three.",
   },
   {
-    t: 156,
-    label: "Spain win it",
-    caption: "The scorebug reads England 2, Spain 3. A red number 15 with Alex on the shirt is in shot.",
-    cut: true,
-    say: "Spain have it. Two-three. The red number fifteen, Alex on the back, is in the picture, and the bug says England two, Spain three.",
+    t: 175,
+    label: "Arms up",
+    caption: "A Spain player, number 5, arms raised. A graphic reads England 2, Spain 3 at Wembley.",
+    say: "Arms up, number five in red. The graphic comes on: Wembley Stadium, England two, Spain three.",
   },
   {
-    t: 184,
+    t: 180,
+    label: "Touchline",
+    caption: "A man in black on the sideline. The graphic still shows England 2, Spain 3.",
+    say: "Along the touchline, a man in black watching it play out. Wembley on the graphic, and Spain still lead by that one goal.",
+  },
+  {
+    t: 185,
+    label: "End card",
+    caption: "England crest end card, with a small interview picture and a subscribe mark.",
+    say: "The pictures leave the pitch. England's crest fills the screen, and this reel is signing off with Spain the winners, two-three.",
+  },
+  {
+    t: 190,
+    label: "Still the card",
+    caption: "The same England end card holds.",
+    say: "Still the end card. No more play, just the crest, and the score we leave on is England two, Spain three at Wembley.",
+  },
+  {
+    t: 195,
     label: "Close",
-    caption: "The reel ends on the England end card. The score that stayed up was England 2, Spain 3.",
-    say: "That's the reel. England at home, Spain the ones who left with it, and the score that stays on this film is two-three.",
+    caption: "The end card remains as the reel runs out.",
+    say: "That's the reel from two minutes twenty-five. Spain took it at Wembley, two goals to three, and the call stays with that.",
   },
 ];
 
 export function loadMatch() {
-  const cues = compileCall(FRAME_NOTES);
+  const cues = compileCall(FRAME_NOTES, { minGap: 4 });
   return {
     ...MATCH,
     cues,

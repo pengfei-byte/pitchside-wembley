@@ -63,6 +63,7 @@ export function compileCall(notes, { minGap = 14 } = {}) {
       label: note.label || "Live",
       caption: note.caption || note.say,
       cut: Boolean(note.cut),
+      hold: Boolean(note.hold),
       words: String(note.say).trim().length,
       cue: director(String(note.say).trim()).slice(0, 2000),
     });

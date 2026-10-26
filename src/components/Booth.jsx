@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { R2Client } from "../lib/r2.js";
 import { closeSession, fetchHealth, fetchMatch, heartbeat, startBroadcast } from "../lib/api.js";
 
-const LEAD_SEC = 2.6;
+const LEAD_SEC = 2.2;
 const CONNECT_TIMEOUT_MS = 20_000;
 const HIDDEN_CLOSE_MS = 25_000;
+const WELCOME_HOLD_MS = 4_800;
 
 function viewerMessage(text) {
   const clean = String(text || "")
@@ -19,24 +20,9 @@ function clock(seconds) {
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-function loadYoutube() {
-  if (window.YT?.Player) return Promise.resolve(window.YT);
-  return new Promise((resolve) => {
-    const previous = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previous?.();
-      resolve(window.YT);
-    };
-    const script = document.createElement("script");
-    script.src = "https://www.youtube.com/iframe_api";
-    document.head.appendChild(script);
-  });
-}
-
 export default function Booth() {
-  const videoHost = useRef(null);
+  const filmRef = useRef(null);
   const remoteVideo = useRef(null);
-  const playerRef = useRef(null);
   const clientRef = useRef(null);
   const sessionRef = useRef(null);
   const cuesRef = useRef([]);
@@ -50,6 +36,7 @@ export default function Booth() {
   const connectTimerRef = useRef(null);
   const hiddenTimerRef = useRef(null);
   const showFailRef = useRef(() => {});
+  const startAtRef = useRef(145);
 
   const [match, setMatch] = useState(null);
   const [health, setHealth] = useState(null);
@@ -85,9 +72,9 @@ export default function Booth() {
     liveRef.current = false;
     setLive(false);
     try {
-      playerRef.current?.pauseVideo?.();
+      filmRef.current?.pause();
     } catch {
-      /* player not ready */
+      /* film not ready */
     }
   }, []);
 
@@ -104,25 +91,16 @@ export default function Booth() {
   }, []);
 
   const syncToFilm = useCallback(() => {
-    const player = playerRef.current;
-    if (!player?.getCurrentTime || !liveRef.current) return;
-    let playing = true;
-    try {
-      playing = player.getPlayerState?.() === window.YT?.PlayerState?.PLAYING;
-      player.mute?.();
-      player.setVolume?.(0);
-    } catch {
-      return;
-    }
-    const time = player.getCurrentTime();
+    const film = filmRef.current;
+    if (!film || !liveRef.current) return;
+    film.muted = true;
+    const time = film.currentTime + startAtRef.current;
     setFilmTime(time);
-    if (!playing) return;
-    const due = cuesRef.current.filter((cue) => !sentRef.current.has(cue.id) && time >= cue.at - LEAD_SEC);
-    if (!due.length) return;
-    const next = due[due.length - 1];
-    due.slice(0, -1).forEach((cue) => sentRef.current.add(cue.id));
-    if (aheadRef.current && !next.cut) return;
-    if (Date.now() < holdUntilRef.current && !next.cut) return;
+    if (film.paused) return;
+    if (Date.now() < holdUntilRef.current) return;
+    if (aheadRef.current) return;
+    const next = cuesRef.current.find((cue) => !sentRef.current.has(cue.id));
+    if (!next || time < next.at - LEAD_SEC) return;
     sayCue(next);
   }, [sayCue]);
 
@@ -144,6 +122,7 @@ export default function Booth() {
   const attachClient = useCallback((data) => {
     sessionRef.current = data.session.session_id;
     cuesRef.current = data.match?.cues || [];
+    startAtRef.current = Number(data.match?.startAt) || 145;
     sentRef.current = new Set();
     aheadRef.current = false;
     const client = new R2Client({
@@ -153,20 +132,17 @@ export default function Booth() {
         const body = msg.data || {};
         if (msg.type === "session.ready") {
           setStatus("Booth open");
-          try {
-            playerRef.current?.mute?.();
-            playerRef.current?.seekTo?.(0, true);
-            playerRef.current?.playVideo?.();
-          } catch {
-            /* player still loading */
+          const film = filmRef.current;
+          if (film) {
+            film.muted = true;
+            film.currentTime = 0;
+            film.play().catch(() => {});
           }
         }
         if (msg.type === "turn.visible") {
           if (body.turn_id && expectedTurnRef.current && body.turn_id !== expectedTurnRef.current) return;
           aheadRef.current = false;
-          const words = currentCueRef.current?.words || 160;
-          const playback = Math.max(7000, Math.round((words / 13) * 1000));
-          holdUntilRef.current = Date.now() + playback;
+          holdUntilRef.current = Date.now() + (currentCueRef.current?.hold ? WELCOME_HOLD_MS : 0);
           setStatus("On the call");
         }
       },
@@ -189,35 +165,6 @@ export default function Booth() {
     setStatus("Opening the booth");
   }, []);
 
-  const ensurePlayer = useCallback(async (videoId) => {
-    const YT = await loadYoutube();
-    if (playerRef.current) {
-      playerRef.current.mute();
-      return playerRef.current;
-    }
-    return new Promise((resolve) => {
-      playerRef.current = new YT.Player(videoHost.current, {
-        videoId,
-        playerVars: {
-          autoplay: 0,
-          mute: 1,
-          controls: 1,
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          origin: window.location.origin,
-        },
-        events: {
-          onReady: (event) => {
-            event.target.mute();
-            event.target.setVolume(0);
-            resolve(event.target);
-          },
-        },
-      });
-    });
-  }, []);
-
   const start = useCallback(async () => {
     if (phase === "joining") return;
     setFail(null);
@@ -229,9 +176,12 @@ export default function Booth() {
     try {
       const film = match || (await fetchMatch());
       setMatch(film);
-      await ensurePlayer(film.videoId);
+      startAtRef.current = Number(film?.startAt) || 145;
       const data = await startBroadcast();
-      if (data.match) setMatch(data.match);
+      if (data.match) {
+        setMatch(data.match);
+        startAtRef.current = Number(data.match.startAt) || startAtRef.current;
+      }
       if (data.mode === "realtime" && data.credentials) {
         attachClient(data);
         clearTimeout(connectTimerRef.current);
@@ -245,7 +195,7 @@ export default function Booth() {
       if (err.payload?.match) setMatch(err.payload.match);
       showFail(err.message);
     }
-  }, [attachClient, ensurePlayer, match, phase, shutdown]);
+  }, [attachClient, match, phase, shutdown]);
 
   useEffect(() => {
     const beat = setInterval(() => {
@@ -300,23 +250,6 @@ export default function Booth() {
       </header>
 
       <main className="floor">
-        <section className="film">
-          <div className="screen">
-            <div ref={videoHost} className="yt" />
-            {phase === "lobby" && (
-              <button type="button" className="start" onClick={start}>
-                Start commentary
-              </button>
-            )}
-            {connecting && <div className="opening">Opening the booth</div>}
-          </div>
-          <div className="film-meta">
-            <p>{match?.competition || "Football"}</p>
-            <span>{match ? `${match.venue} · ${match.kickoff}` : "Loading the reel"}</span>
-          </div>
-          <p className="mute-note">The match film stays muted. Martin Hale calls what is on the screen.</p>
-        </section>
-
         <aside className="caller">
           <div className="portrait">
             <video ref={remoteVideo} autoPlay playsInline onPlaying={() => { liveRef.current = true; setLive(true); clearTimeout(connectTimerRef.current); }} />
@@ -345,6 +278,24 @@ export default function Booth() {
             {health?.realtime ? "Booth ready." : "Booth updating."} {match?.filmed}
           </p>
         </aside>
+
+        <section className="film">
+          <div className="screen">
+            <video ref={filmRef} className="match-film" src="/match.mp4" muted playsInline preload="auto" />
+            <div className="film-shield" />
+            {phase === "lobby" && (
+              <button type="button" className="start" onClick={start}>
+                Start commentary
+              </button>
+            )}
+            {connecting && <div className="opening">Opening the booth</div>}
+          </div>
+          <div className="film-meta">
+            <p>{match?.competition || "Football"}</p>
+            <span>{match ? `${match.venue} · from ${clock(match.startAt || 0)}` : "Loading the reel"}</span>
+          </div>
+          <p className="mute-note">The match film is muted and cannot be scrubbed. Martin Hale calls what is on the screen.</p>
+        </section>
       </main>
       <p className="powered">Powered by Reverie R2 API</p>
       {fail && (

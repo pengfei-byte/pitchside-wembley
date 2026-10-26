@@ -30,19 +30,19 @@ test("compileCall keeps picture order and drops lines that would talk over each 
   assert.ok(cues.every((cue) => cue.cue.length <= 2000));
 });
 
-test("the Wembley reel is called in timestamp order from the frames", () => {
+test("the Wembley reel starts at 2:25 with a welcome and a line every five seconds", () => {
   const match = loadMatch();
-  assert.equal(match.videoId, "oewyeR5F7TM");
-  assert.ok(match.cues.length >= 8);
+  assert.equal(match.video, "/match.mp4");
+  assert.equal(match.startAt, 145);
+  assert.ok(match.cues.length >= 10);
+  assert.match(
+    match.cues[0].cue,
+    /Welcome to the Pitchside, Your Live football commentator powered by Reverie AI\./
+  );
+  assert.equal(match.cues[0].hold, true);
   for (let i = 1; i < match.cues.length; i += 1) {
-    assert.ok(match.cues[i].at - match.cues[i - 1].at >= 14);
+    const gap = match.cues[i].at - match.cues[i - 1].at;
+    assert.ok(gap >= 4 && gap <= 6, gap);
   }
-  const spoken = match.cues.map((cue) => cue.cue).join("\n");
-  const lead = spoken.indexOf("England two, Spain one");
-  const level = spoken.indexOf("England two, Spain two");
-  const winner = spoken.indexOf("England two, Spain three");
-  assert.ok(lead > 0 && level > lead && winner > level);
-  const scoreCues = match.cues.filter((cue) => cue.cut);
-  assert.deepEqual(scoreCues.map((cue) => cue.label), ["England lead", "Level again", "Spain win it"]);
-  assert.match(match.cues[0].cue, /Wembley/);
+  assert.match(match.cues.map((cue) => cue.cue).join("\n"), /England two, Spain three/);
 });

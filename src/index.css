@@ -53,7 +53,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
 .floor {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.45fr);
   gap: 16px;
   align-items: start;
   padding-bottom: 28px;
@@ -65,7 +65,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   border: 1px solid var(--line);
   overflow: hidden;
 }
-.screen iframe, .yt { position: absolute; inset: 0; width: 100%; height: 100%; }
+.match-film { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.film-shield { position: absolute; inset: 0; z-index: 1; }
 .start, .opening {
   position: absolute;
   left: 50%;

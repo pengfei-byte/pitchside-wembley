@@ -138,6 +138,8 @@ function publicMatch(match) {
     venue: match.venue,
     kickoff: match.kickoff,
     filmed: match.filmed,
+    video: match.video,
+    startAt: match.startAt,
     cues: match.cues,
   };
 }
